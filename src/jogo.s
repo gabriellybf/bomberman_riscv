@@ -1,8 +1,11 @@
 .include "char.s"
 .include "char_branco.s"
+.include "bombinha.s"
 
 .data
 char_x: .word 0
+bomba_x: .word -1
+bomba_y: .word -1 #salvo como -1 para evitar acidentes e o personagem poder pisar em 0x0
 
 .text
 .globl main
@@ -27,8 +30,33 @@ loop:
 	
 	li t1, 115         # tecla 's' no código ASCII
 	beq s0, t1, down
+	
+	li t1, 101         # tecla 'e' no código ASCII
+	beq s0, t1, bomb
 
 	j loop
+
+## IMPLANTAR A BOMBA COM A TECLA "e"
+bomb:
+	# desenhar bomba
+	la a0, bomba
+	mv a1, s1
+	mv a2, s3
+	li a3, 0
+	call PRINT
+
+	# salvar posição da bomba
+	la t0, bomba_x
+	sw s1, 0(t0)
+	la t0, bomba_y
+	sw s3, 0(t0)
+
+	# redesenhar o personagem por cima imediatamente
+	la a0, char
+	mv a1, s1
+	mv a2, s3
+	li a3, 0
+	call PRINT
 
 ## MOVIMENTO PARA A DIREITA
 right:
@@ -37,20 +65,59 @@ right:
 
 	bgt t1, t0, linha_baixo  # se próxima posição passa do limite, muda linha
 
-	# apagar sprite anterior
+	# checar se a posição atual do personagem é uma bomba
+	la t2, bomba_x
+	lw t2, 0(t2)
+	la t3, bomba_y
+	lw t3, 0(t3)
+
+	mv t4, s1     # posição X atual
+	mv t5, s3     # posição Y atual
+
+	beq t2, t4, check_y_atual_bomba_d
+	j desenha_fundo_d
+
+check_y_atual_bomba_d:
+	beq t3, t5, desenha_bomba_d
+	j desenha_fundo_d
+
+desenha_bomba_d:
+	la a0, bomba
+	j desenha_d
+
+desenha_fundo_d:
 	la a0, char_preto
+
+desenha_d:
 	mv a1, s1
 	mv a2, s3
+	li a3, 0          # NÃO ESQUECE: se o PRINT usa a3, define ele
 	call PRINT
 
-	# atualizar posição
+	# checar se próxima posição tem bomba
+	la t2, bomba_x
+	lw t2, 0(t2)
+	la t3, bomba_y
+	lw t3, 0(t3)
+
+	addi t4, s1, 16   # posição futura X
+	mv t5, s3         # posição futura Y
+
+	beq t2, t4, check_y_bomba_d
+	j pode_ir_direita
+
+check_y_bomba_d:
+	beq t3, t5, loop
+	j pode_ir_direita
+
+pode_ir_direita:
 	mv s2, s1
 	addi s1, s1, 16
 
-	# desenhar novo sprite
 	la a0, char
 	mv a1, s1
 	mv a2, s3
+	li a3, 0
 	call PRINT
 
 	j loop
@@ -83,8 +150,28 @@ left:
 	mv a2, s3
 	call PRINT
 
-	mv s2, s1
-	addi s1, s1, -16
+# checar se próxima posição tem bomba
+	la t2, bomba_x
+	lw t2, 0(t2)
+	la t3, bomba_y
+	lw t3, 0(t3)
+
+	addi t4, s1, -16   # posição futura X
+	mv t5, s3          # posição futura Y
+
+	beq t2, t4, check_y_bomba_e
+	j pode_ir_esquerda
+
+check_y_bomba_e:
+	beq t3, t5, loop
+	j pode_ir_esquerda
+
+pode_ir_esquerda:
+	addi t4, s1, -16   # nova posição X (indo pra esquerda)
+	addi t5, s3, 0     # mantém Y
+
+	mv s1, t4
+	mv s3, t5
 
 	la a0, char
 	mv a1, s1
@@ -102,8 +189,28 @@ up:
 	mv a2, s3
 	call PRINT
 
-	mv s4, s3
-	addi s3, s3, -16
+# checar se próxima posição tem bomba
+	la t2, bomba_x
+	lw t2, 0(t2)
+	la t3, bomba_y
+	lw t3, 0(t3)
+
+	addi t4, s1, -16   # posição futura X
+	mv t5, s3         # posição futura Y
+
+	beq t2, t4, check_y_bomba_c
+	j pode_ir_cima
+
+check_y_bomba_c:
+	beq t3, t5, loop
+	j pode_ir_cima
+
+pode_ir_cima:
+	addi t4, s1, 0
+	addi t5, s3, -16
+
+	mv s1, t4
+	mv s3, t5
 
 	la a0, char
 	mv a1, s1
@@ -122,8 +229,28 @@ down:
 	mv a2, s3
 	call PRINT
 
-	mv s4, s3
-	addi s3, s3, 16
+# checar se próxima posição tem bomba
+	la t2, bomba_x
+	lw t2, 0(t2)
+	la t3, bomba_y
+	lw t3, 0(t3)
+
+	addi t4, s1, 16   # posição futura X
+	mv t5, s3         # posição futura Y
+
+	beq t2, t4, check_y_bomba_b
+	j pode_ir_baixo
+
+check_y_bomba_b:
+	beq t3, t5, loop
+	j pode_ir_baixo
+
+pode_ir_baixo:
+	addi t4, s1, 0
+	addi t5, s3, 16
+
+	mv s1, t4
+	mv s3, t5
 
 	la a0, char
 	mv a1, s1
