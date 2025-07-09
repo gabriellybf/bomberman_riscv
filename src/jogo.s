@@ -1,262 +1,232 @@
-.include "char.s"
+.include "char.s" 
 .include "char_branco.s"
 .include "bombinha.s"
 
 .data
 char_x: .word 0
 bomba_x: .word -1
-bomba_y: .word -1 #salvo como -1 para evitar acidentes e o personagem poder pisar em 0x0
+bomba_y: .word -1
 
 .text
 .globl main
 
 main:
-	li s1, 0           # posição X atual
-	li s2, 0           # posição X anterior
-	li s3, 0           # posição Y atual
-	li s4, 0           # posição Y anterior
+	li s1, 0
+	li s2, 0
+	li s3, 0
+	li s4, 0
 
 loop:
-	call GetCharacter  # lê caractere em s0
-
-	li t1, 100         # tecla 'd' no código ASCII
+	call GetCharacter
+	li t1, 100
 	beq s0, t1, right
-	
-	li t1, 97          # tecla 'a' no código ASCII
+	li t1, 97
 	beq s0, t1, left
-	
-	li t1, 119         # tecla 'w' no código ASCII
+	li t1, 119
 	beq s0, t1, up
-	
-	li t1, 115         # tecla 's' no código ASCII
+	li t1, 115
 	beq s0, t1, down
-	
-	li t1, 101         # tecla 'e' no código ASCII
+	li t1, 101
 	beq s0, t1, bomb
-
 	j loop
 
-## IMPLANTAR A BOMBA COM A TECLA "e"
 bomb:
-	# desenhar bomba
 	la a0, bomba
 	mv a1, s1
 	mv a2, s3
 	li a3, 0
 	call PRINT
 
-	# salvar posição da bomba
 	la t0, bomba_x
 	sw s1, 0(t0)
 	la t0, bomba_y
 	sw s3, 0(t0)
 
-	# redesenhar o personagem por cima imediatamente
 	la a0, char
 	mv a1, s1
 	mv a2, s3
 	li a3, 0
 	call PRINT
+	j loop
 
-## MOVIMENTO PARA A DIREITA
+##******** DIREITA
 right:
-	li t0, 304         # limite horizontal (max X)
-	addi t1, s1, 16    # próxima posição X
+	li t0, 304
+	addi t1, s1, 16
+	bgt t1, t0, linha_baixo
 
-	bgt t1, t0, linha_baixo  # se próxima posição passa do limite, muda linha
-
-	# checar se a posição atual do personagem é uma bomba
+	#******** verifica se está saindo de cima da bomba
 	la t2, bomba_x
 	lw t2, 0(t2)
 	la t3, bomba_y
 	lw t3, 0(t3)
-
-	mv t4, s1     # posição X atual
-	mv t5, s3     # posição Y atual
-
+	mv t4, s1
+	mv t5, s3
 	beq t2, t4, check_y_atual_bomba_d
-	j desenha_fundo_d
+	j limpa_d
 
 check_y_atual_bomba_d:
-	beq t3, t5, desenha_bomba_d
-	j desenha_fundo_d
+	beq t3, t5, printa_bomba_d
+	j limpa_d
 
-desenha_bomba_d:
+printa_bomba_d:
 	la a0, bomba
-	j desenha_d
+	j printa_saida_d
 
-desenha_fundo_d:
+limpa_d:
 	la a0, char_preto
 
-desenha_d:
-	mv a1, s1
-	mv a2, s3
-	li a3, 0          # NÃO ESQUECE: se o PRINT usa a3, define ele
-	call PRINT
-
-	# checar se próxima posição tem bomba
-	la t2, bomba_x
-	lw t2, 0(t2)
-	la t3, bomba_y
-	lw t3, 0(t3)
-
-	addi t4, s1, 16   # posição futura X
-	mv t5, s3         # posição futura Y
-
-	beq t2, t4, check_y_bomba_d
-	j pode_ir_direita
-
-check_y_bomba_d:
-	beq t3, t5, loop
-	j pode_ir_direita
-
-pode_ir_direita:
-	mv s2, s1
-	addi s1, s1, 16
-
-	la a0, char
+printa_saida_d:
 	mv a1, s1
 	mv a2, s3
 	li a3, 0
 	call PRINT
 
-	j loop
+	#******** personagem pode andar sobre bomba, mas tem consequências
 
-linha_baixo:
-	# apagar sprite anterior
-	la a0, char_preto
-	mv a1, s1
-	mv a2, s3
-	call PRINT
-
-	# desce uma linha e reseta x
-	li s1, 0
-	addi s3, s3, 16
-
-	# desenhar novo sprite
+	mv s2, s1
+	addi s1, s1, 16
 	la a0, char
 	mv a1, s1
 	mv a2, s3
+	li a3, 0
 	call PRINT
-
 	j loop
 
-## MOVIMENTO PARA A ESQUERDA
+##******** ESQUERDA
 left:
 	ble s1, zero, loop
 
-	la a0, char_preto
-	mv a1, s1
-	mv a2, s3
-	call PRINT
-
-# checar se próxima posição tem bomba
+	#******** verifica se está saindo de cima da bomba
 	la t2, bomba_x
 	lw t2, 0(t2)
 	la t3, bomba_y
 	lw t3, 0(t3)
+	mv t4, s1
+	mv t5, s3
+	beq t2, t4, check_y_atual_bomba_e
+	j limpa_e
 
-	addi t4, s1, -16   # posição futura X
-	mv t5, s3          # posição futura Y
+check_y_atual_bomba_e:
+	beq t3, t5, printa_bomba_e
+	j limpa_e
 
-	beq t2, t4, check_y_bomba_e
-	j pode_ir_esquerda
+printa_bomba_e:
+	la a0, bomba
+	j printa_saida_e
 
-check_y_bomba_e:
-	beq t3, t5, loop
-	j pode_ir_esquerda
+limpa_e:
+	la a0, char_preto
 
-pode_ir_esquerda:
-	addi t4, s1, -16   # nova posição X (indo pra esquerda)
-	addi t5, s3, 0     # mantém Y
+printa_saida_e:
+	mv a1, s1
+	mv a2, s3
+	li a3, 0
+	call PRINT
 
+	#******** REMOVIDO: checagem de bomba no destino
+
+	addi t4, s1, -16
 	mv s1, t4
-	mv s3, t5
-
 	la a0, char
 	mv a1, s1
 	mv a2, s3
+	li a3, 0
 	call PRINT
-
 	j loop
 
-## MOVIMENTO PARA CIMA
+##******** CIMA
 up:
 	ble s3, zero, loop
 
-	la a0, char_preto
-	mv a1, s1
-	mv a2, s3
-	call PRINT
-
-# checar se próxima posição tem bomba
+	#******** verifica se está saindo de cima da bomba
 	la t2, bomba_x
 	lw t2, 0(t2)
 	la t3, bomba_y
 	lw t3, 0(t3)
+	mv t4, s1
+	mv t5, s3
+	beq t2, t4, check_y_atual_bomba_c
+	j limpa_c
 
-	addi t4, s1, -16   # posição futura X
-	mv t5, s3         # posição futura Y
+check_y_atual_bomba_c:
+	beq t3, t5, printa_bomba_c
+	j limpa_c
 
-	beq t2, t4, check_y_bomba_c
-	j pode_ir_cima
+printa_bomba_c:
+	la a0, bomba
+	j printa_saida_c
 
-check_y_bomba_c:
-	beq t3, t5, loop
-	j pode_ir_cima
+limpa_c:
+	la a0, char_preto
 
-pode_ir_cima:
-	addi t4, s1, 0
-	addi t5, s3, -16
+printa_saida_c:
+	mv a1, s1
+	mv a2, s3
+	li a3, 0
+	call PRINT
 
-	mv s1, t4
-	mv s3, t5
-
+	addi s3, s3, -16
 	la a0, char
 	mv a1, s1
 	mv a2, s3
+	li a3, 0
 	call PRINT
-
 	j loop
 
-## MOVIMENTO PARA BAIXO
+##******** BAIXO
 down:
 	li t0, 224
 	bge s3, t0, loop
 
+	#******** verifica se está saindo de cima da bomba
+	la t2, bomba_x
+	lw t2, 0(t2)
+	la t3, bomba_y
+	lw t3, 0(t3)
+	mv t4, s1
+	mv t5, s3
+	beq t2, t4, check_y_atual_bomba_b
+	j limpa_b
+
+check_y_atual_bomba_b:
+	beq t3, t5, printa_bomba_b
+	j limpa_b
+
+printa_bomba_b:
+	la a0, bomba
+	j printa_saida_b
+
+limpa_b:
+	la a0, char_preto
+
+printa_saida_b:
+	mv a1, s1
+	mv a2, s3
+	li a3, 0
+	call PRINT
+
+	addi s3, s3, 16
+	la a0, char
+	mv a1, s1
+	mv a2, s3
+	li a3, 0
+	call PRINT
+	j loop
+
+linha_baixo:
 	la a0, char_preto
 	mv a1, s1
 	mv a2, s3
 	call PRINT
 
-# checar se próxima posição tem bomba
-	la t2, bomba_x
-	lw t2, 0(t2)
-	la t3, bomba_y
-	lw t3, 0(t3)
-
-	addi t4, s1, 16   # posição futura X
-	mv t5, s3         # posição futura Y
-
-	beq t2, t4, check_y_bomba_b
-	j pode_ir_baixo
-
-check_y_bomba_b:
-	beq t3, t5, loop
-	j pode_ir_baixo
-
-pode_ir_baixo:
-	addi t4, s1, 0
-	addi t5, s3, 16
-
-	mv s1, t4
-	mv s3, t5
+	li s1, 0
+	addi s3, s3, 16
 
 	la a0, char
 	mv a1, s1
 	mv a2, s3
 	call PRINT
-
 	j loop
 
 ## PRINT
@@ -274,13 +244,12 @@ PRINT:
 	mv t2, zero
 	mv t3, zero
 
-	lw t4, 0(a0)     # largura
-	lw t5, 4(a0)     # altura
+	lw t4, 0(a0)
+	lw t5, 4(a0)
 
 PRINT_LINHA:
 	lw t6, 0(t1)
 	sw t6, 0(t0)
-
 	addi t0, t0, 4
 	addi t1, t1, 4
 	addi t3, t3, 4
@@ -294,7 +263,7 @@ PRINT_LINHA:
 
 	ret
 
-## LER O CARACTERE DO TECLADO
+## GET CHARACTER
 GetCharacter:
 	addi sp, sp, -4
 	sw ra, 0(sp)
