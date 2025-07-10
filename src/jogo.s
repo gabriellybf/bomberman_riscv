@@ -1,19 +1,19 @@
-.include "char.s" 
+.include "char.s"
 .include "char_branco.s"
 .include "bombinha.s"
 
 .data
 char_x: .word 0
-bomba_x: .word -1
-bomba_y: .word -1
+bomba_x: .word -1, -1, -1, -1, -1
+bomba_y: .word -1, -1, -1, -1, -1
 
 .text
 .globl main
 
 main:
-	li s1, 0
+	li s1, 0  # pos x
 	li s2, 0
-	li s3, 0
+	li s3, 0  # pos y
 	li s4, 0
 
 loop:
@@ -31,16 +31,31 @@ loop:
 	j loop
 
 bomb:
+	li t0, 0               # índice i = 0
+	la t1, bomba_x
+	la t2, bomba_y
+
+encontra_vaga:
+	lw t3, 0(t1)           # carrega bomba_x[i]
+	li t4, -1
+	beq t3, t4, salva_pos
+	addi t0, t0, 1
+	addi t1, t1, 4         # próxima posição do array bomba_x
+	addi t2, t2, 4         # próxima posição do array bomba_y
+	li t5, 5
+	blt t0, t5, encontra_vaga
+	j continua_bomba       # se não tiver espaço, apenas continua
+
+salva_pos:
+	sw s1, 0(t1)           # salva x
+	sw s3, 0(t2)           # salva y
+
+continua_bomba:
 	la a0, bomba
 	mv a1, s1
 	mv a2, s3
 	li a3, 0
 	call PRINT
-
-	la t0, bomba_x
-	sw s1, 0(t0)
-	la t0, bomba_y
-	sw s3, 0(t0)
 
 	la a0, char
 	mv a1, s1
@@ -55,25 +70,26 @@ right:
 	addi t1, s1, 16
 	bgt t1, t0, linha_baixo
 
-	#******** verifica se está saindo de cima da bomba
-	la t2, bomba_x
-	lw t2, 0(t2)
-	la t3, bomba_y
-	lw t3, 0(t3)
-	mv t4, s1
-	mv t5, s3
-	beq t2, t4, check_y_atual_bomba_d
-	j limpa_d
+	#******** verifica se está saindo de cima de qualquer bomba
+	li t0, 0
+	la t1, bomba_x
+	la t2, bomba_y
 
-check_y_atual_bomba_d:
-	beq t3, t5, printa_bomba_d
-	j limpa_d
-
-printa_bomba_d:
+loop_bombas_d:
+	lw t3, 0(t1)
+	lw t4, 0(t2)
+	bne t3, s1, proxima_bomba_d
+	bne t4, s3, proxima_bomba_d
 	la a0, bomba
 	j printa_saida_d
 
-limpa_d:
+proxima_bomba_d:
+	addi t1, t1, 4
+	addi t2, t2, 4
+	addi t0, t0, 1
+	li t5, 5
+	blt t0, t5, loop_bombas_d
+
 	la a0, char_preto
 
 printa_saida_d:
@@ -81,8 +97,6 @@ printa_saida_d:
 	mv a2, s3
 	li a3, 0
 	call PRINT
-
-	#******** personagem pode andar sobre bomba, mas tem consequências
 
 	mv s2, s1
 	addi s1, s1, 16
@@ -97,25 +111,25 @@ printa_saida_d:
 left:
 	ble s1, zero, loop
 
-	#******** verifica se está saindo de cima da bomba
-	la t2, bomba_x
-	lw t2, 0(t2)
-	la t3, bomba_y
-	lw t3, 0(t3)
-	mv t4, s1
-	mv t5, s3
-	beq t2, t4, check_y_atual_bomba_e
-	j limpa_e
+	li t0, 0
+	la t1, bomba_x
+	la t2, bomba_y
 
-check_y_atual_bomba_e:
-	beq t3, t5, printa_bomba_e
-	j limpa_e
-
-printa_bomba_e:
+loop_bombas_e:
+	lw t3, 0(t1)
+	lw t4, 0(t2)
+	bne t3, s1, proxima_bomba_e
+	bne t4, s3, proxima_bomba_e
 	la a0, bomba
 	j printa_saida_e
 
-limpa_e:
+proxima_bomba_e:
+	addi t1, t1, 4
+	addi t2, t2, 4
+	addi t0, t0, 1
+	li t5, 5
+	blt t0, t5, loop_bombas_e
+
 	la a0, char_preto
 
 printa_saida_e:
@@ -124,10 +138,7 @@ printa_saida_e:
 	li a3, 0
 	call PRINT
 
-	#******** REMOVIDO: checagem de bomba no destino
-
-	addi t4, s1, -16
-	mv s1, t4
+	addi s1, s1, -16
 	la a0, char
 	mv a1, s1
 	mv a2, s3
@@ -139,25 +150,25 @@ printa_saida_e:
 up:
 	ble s3, zero, loop
 
-	#******** verifica se está saindo de cima da bomba
-	la t2, bomba_x
-	lw t2, 0(t2)
-	la t3, bomba_y
-	lw t3, 0(t3)
-	mv t4, s1
-	mv t5, s3
-	beq t2, t4, check_y_atual_bomba_c
-	j limpa_c
+	li t0, 0
+	la t1, bomba_x
+	la t2, bomba_y
 
-check_y_atual_bomba_c:
-	beq t3, t5, printa_bomba_c
-	j limpa_c
-
-printa_bomba_c:
+loop_bombas_c:
+	lw t3, 0(t1)
+	lw t4, 0(t2)
+	bne t3, s1, proxima_bomba_c
+	bne t4, s3, proxima_bomba_c
 	la a0, bomba
 	j printa_saida_c
 
-limpa_c:
+proxima_bomba_c:
+	addi t1, t1, 4
+	addi t2, t2, 4
+	addi t0, t0, 1
+	li t5, 5
+	blt t0, t5, loop_bombas_c
+
 	la a0, char_preto
 
 printa_saida_c:
@@ -179,25 +190,25 @@ down:
 	li t0, 224
 	bge s3, t0, loop
 
-	#******** verifica se está saindo de cima da bomba
-	la t2, bomba_x
-	lw t2, 0(t2)
-	la t3, bomba_y
-	lw t3, 0(t3)
-	mv t4, s1
-	mv t5, s3
-	beq t2, t4, check_y_atual_bomba_b
-	j limpa_b
+	li t0, 0
+	la t1, bomba_x
+	la t2, bomba_y
 
-check_y_atual_bomba_b:
-	beq t3, t5, printa_bomba_b
-	j limpa_b
-
-printa_bomba_b:
+loop_bombas_b:
+	lw t3, 0(t1)
+	lw t4, 0(t2)
+	bne t3, s1, proxima_bomba_b
+	bne t4, s3, proxima_bomba_b
 	la a0, bomba
 	j printa_saida_b
 
-limpa_b:
+proxima_bomba_b:
+	addi t1, t1, 4
+	addi t2, t2, 4
+	addi t0, t0, 1
+	li t5, 5
+	blt t0, t5, loop_bombas_b
+
 	la a0, char_preto
 
 printa_saida_b:
