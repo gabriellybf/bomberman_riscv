@@ -1,76 +1,228 @@
 .include "char.s"
 .include "char_branco.s"
 .include "bombinha.s"
+.include "inimigo.data"
 
 .data
 char_x: .word 0
 bomba_x: .word -1, -1, -1, -1, -1
 bomba_y: .word -1, -1, -1, -1, -1
+bomba_timer: .word 0, 0, 0, 0, 0
+inimigos_x: .word -1, -1, -1, -1, -1
+vidas: .word 3
+jogador_atingido: .word 0   # usado pra resetar dps da explosão
 
 .text
 .globl main
 
 main:
-	li s1, 0  # pos x
-	li s2, 0
-	li s3, 0  # pos y
-	li s4, 0
+    li s1, 0  # pos x do jogador
+    li s3, 0  # pos y do jogador
 
 loop:
-	call GetCharacter
-	li t1, 100
-	beq s0, t1, right
-	li t1, 97
-	beq s0, t1, left
-	li t1, 119
-	beq s0, t1, up
-	li t1, 115
-	beq s0, t1, down
-	li t1, 101
-	beq s0, t1, bomb
-	j loop
+    jal IsCharacterThere
+    beq s0, zero, sem_tecla
 
+    jal GetCharacter
+
+    li t1, 100
+    beq s0, t1, right
+    li t1, 97
+    beq s0, t1, left
+    li t1, 119
+    beq s0, t1, up
+    li t1, 115
+    beq s0, t1, down
+    li t1, 101
+    beq s0, t1, bomb
+
+sem_tecla:
+    jal atualiza_bombas
+    j loop
+
+# BOMBA
 bomb:
-	li t0, 0               # índice i = 0
-	la t1, bomba_x
-	la t2, bomba_y
+    li t0, 0
+    la t1, bomba_x
+    la t2, bomba_y
+    la t6, bomba_timer
 
 encontra_vaga:
-	lw t3, 0(t1)           # carrega bomba_x[i]
-	li t4, -1
-	beq t3, t4, salva_pos
-	addi t0, t0, 1
-	addi t1, t1, 4         # próxima posição do array bomba_x
-	addi t2, t2, 4         # próxima posição do array bomba_y
-	li t5, 5
-	blt t0, t5, encontra_vaga
-	j continua_bomba       # se não tiver espaço, apenas continua
+    lw t3, 0(t1)
+    li t4, -1
+    beq t3, t4, salva_pos
+    addi t0, t0, 1
+    addi t1, t1, 4
+    addi t2, t2, 4
+    addi t6, t6, 4
+    li t5, 5
+    blt t0, t5, encontra_vaga
+    j continua_bomba
 
 salva_pos:
-	sw s1, 0(t1)           # salva x
-	sw s3, 0(t2)           # salva y
+    sw s1, 0(t1)
+    sw s3, 0(t2)
+    sw zero, 0(t6)
 
 continua_bomba:
-	la a0, bomba
-	mv a1, s1
-	mv a2, s3
-	li a3, 0
-	call PRINT
+    la a0, bomba
+    mv a1, s1
+    mv a2, s3
+    li a3, 0
+    call PRINT
 
-	la a0, char
-	mv a1, s1
-	mv a2, s3
-	li a3, 0
-	call PRINT
-	j loop
+    la a0, char
+    mv a1, s1
+    mv a2, s3
+    li a3, 0
+    call PRINT
+    j loop
+
+# ATUALIZAÇÃO DAS BOMBAS
+atualiza_bombas:
+    li t0, 0
+    la t1, bomba_x
+    la t2, bomba_y
+    la t3, bomba_timer
+    li t4, 5
+
+atualiza_loop:
+    lw t5, 0(t1)
+    li t6, -1
+    beq t5, t6, proxima_bomba
+
+    lw s7, 0(t3)
+    addi s7, s7, 1
+    sw s7, 0(t3)
+
+    li s8, 5000 #tempo q a bomba vai demorar pra explodir
+    bne s7, s8, proxima_bomba
+
+    mv a1, t5
+    lw a2, 0(t2)
+    li a3, 0
+    jal explosao
+
+    # limpa bomba
+    li t6, -1
+    sw t6, 0(t1)
+    sw t6, 0(t2)
+    sw zero, 0(t3)
+
+proxima_bomba:
+    addi t0, t0, 1
+    addi t1, t1, 4
+    addi t2, t2, 4
+    addi t3, t3, 4
+    blt t0, t4, atualiza_loop
+    ret
+
+# EXPLOSAO
+explosao:
+    # limpa flag de dano
+    la t6, jogador_atingido
+    sw zero, 0(t6)
+
+    # centro
+    la a0, bomba
+    call PRINT
+
+    # cima
+    addi a2, a2, -16
+    call PRINT
+    addi a2, a2, 16
+
+    # baixo
+    addi a2, a2, 16
+    call PRINT
+    addi a2, a2, -16
+
+    # esquerda
+    addi a1, a1, -16
+    call PRINT
+    addi a1, a1, 16
+
+    # direita
+    addi a1, a1, 16
+    call PRINT
+    addi a1, a1, -16
+
+    # checa dano
+    mv t1, a1
+    mv t2, a2
+
+    call checa_dano      # centro
+    addi t2, t2, -16
+    call checa_dano      # cima
+    addi t2, t2, 32
+    call checa_dano      # baixo
+    addi t2, t2, -16
+
+    addi t1, t1, -16
+    call checa_dano      # esquerda
+    addi t1, t1, 32
+    call checa_dano      # direita
+    addi t1, t1, -16
+
+    li t3, 100000
+espera_explosao:
+    addi t3, t3, -1
+    bnez t3, espera_explosao
+
+    # apagar explosão
+    la a0, char_preto
+    mv a1, a1
+    mv a2, a2
+    li a3, 0
+    call PRINT
+
+    addi a2, a2, -16
+    call PRINT
+    addi a2, a2, 32
+    call PRINT
+    addi a2, a2, -16
+
+    addi a1, a1, -16
+    call PRINT
+    addi a1, a1, 32
+    call PRINT
+    addi a1, a1, -16
+
+    # se levou dano, resetar
+    la t6, jogador_atingido
+    lw s10, 0(t6)
+    beqz s10, volta
+    li s1, 0
+    li s3, 0
+    la a0, char
+    mv a1, s1
+    mv a2, s3
+    li a3, 0
+    call PRINT
+volta:
+    j loop
+
+# DANO
+checa_dano:
+    bne t1, s1, no_dano
+    bne t2, s3, no_dano
+    la t3, vidas
+    lw t4, 0(t3)
+    addi t4, t4, -1
+    sw t4, 0(t3)
+
+    la t5, jogador_atingido
+    li t6, 1
+    sw t6, 0(t5)
+no_dano:
+    ret
 
 ##******** DIREITA
 right:
-	li t0, 304
+	li t0, 304           # limite do mapa na horizontal
 	addi t1, s1, 16
-	bgt t1, t0, linha_baixo
+	bgt t1, t0, loop     # se passar do limite, não anda
 
-	#******** verifica se está saindo de cima de qualquer bomba
 	li t0, 0
 	la t1, bomba_x
 	la t2, bomba_y
@@ -98,7 +250,6 @@ printa_saida_d:
 	li a3, 0
 	call PRINT
 
-	mv s2, s1
 	addi s1, s1, 16
 	la a0, char
 	mv a1, s1
@@ -225,21 +376,6 @@ printa_saida_b:
 	call PRINT
 	j loop
 
-linha_baixo:
-	la a0, char_preto
-	mv a1, s1
-	mv a2, s3
-	call PRINT
-
-	li s1, 0
-	addi s3, s3, 16
-
-	la a0, char
-	mv a1, s1
-	mv a2, s3
-	call PRINT
-	j loop
-
 ## PRINT
 PRINT:
 	li t0, 0xFF0
@@ -298,3 +434,76 @@ IsCharacterThere:
 	lw t1, 0(t0)
 	andi s0, t1, 1
 	ret
+	
+movimento:
+	li s10, 4              # são 4 movimentos (16, 0, 16, 32)
+
+movimento_loop:
+	# guarda posição anterior
+	mv s2, s8
+	li s4, 16
+
+	# apaga inimigo na posição anterior
+	la a0, char_preto
+	mv a1, s2
+	mv a2, s4
+	li a3, 0
+	call PRINT
+
+	# altera direção se estiver no passo 2 (s9 == 1)
+	li s11,1
+	beq s9, s11, volta_pro_zero
+
+# movimento normal pra direita
+	addi s8, s8, 16
+	j desenha
+
+volta_pro_zero:
+	li s8, 0
+
+desenha:
+	# imprime inimigo na nova posição
+	la a0, char
+	mv a1, s8
+	mv a2, s4
+	li a3, 0
+	call PRINT
+
+	# delay
+	li s6, 100000
+delay_loop:
+	addi s6, s6, -1
+	bnez s6, delay_loop
+
+	# incrementa contador de movimentos
+	addi s9, s9, 1
+	blt s9, s10, movimento_loop
+
+reiniciar:
+	# apaga onde parou (última posição)
+	li s4, 16
+	la a0, char_preto
+	mv a1, s8
+	mv a2, s4
+	li a3, 0
+	call PRINT
+
+	# reinicia variáveis
+	li s8, 0
+	li s9, 0
+
+	# imprime inimigo de volta no início
+	la a0, char
+	mv a1, s8
+	mv a2, s4
+	li a3, 0
+	call PRINT
+
+	# delay antes de começar de novo
+	li s6, 100000
+delay_loop_reiniciar:
+	addi s6, s6, -1
+	bnez s6, delay_loop_reiniciar
+
+	# volta pro loop
+	j movimento_loop 
