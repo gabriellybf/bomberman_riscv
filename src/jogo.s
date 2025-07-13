@@ -95,13 +95,26 @@ atualiza_loop:
     addi s7, s7, 1
     sw s7, 0(t3)
 
-    li s8, 5000 #tempo q a bomba vai demorar pra explodir
+    li s8, 8000 #tempo q a bomba vai demorar pra explodir
     bne s7, s8, proxima_bomba
 
     mv a1, t5
     lw a2, 0(t2)
     li a3, 0
+
+    # salva os ponteiros antes do jal
+    addi sp, sp, -12
+    sw t1, 0(sp)
+    sw t2, 4(sp)
+    sw t3, 8(sp)
+
     jal explosao
+
+    # recupera ponteiros
+    lw t1, 0(sp)
+    lw t2, 4(sp)
+    lw t3, 8(sp)
+    addi sp, sp, 12
 
     # limpa bomba
     li t6, -1
@@ -506,4 +519,4 @@ delay_loop_reiniciar:
 	bnez s6, delay_loop_reiniciar
 
 	# volta pro loop
-	j movimento_loop 
+	j movimento_loop
