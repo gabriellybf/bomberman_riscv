@@ -2,6 +2,7 @@
 .include "char_branco.s"
 .include "bombinha.s"
 .include "inimigo.data"
+.include "mapa2.data"
 
 .data
 char_x: .word 0
@@ -13,12 +14,16 @@ vidas: .word 3
 jogador_atingido: .word 0   # usado pra resetar dps da explosão
 
 .text
+   li s1, 0xFF000000
+   li s2, 0xFF012C00
+   la s0, mapa2
+   addi s0, s0, 8
+
 .globl main
 
 main:
-    li s1, 0  # pos x do jogador
-    li s3, 0  # pos y do jogador
-
+    jal LOOP1
+    
 loop:
     jal IsCharacterThere
     beq s0, zero, sem_tecla
@@ -38,7 +43,25 @@ loop:
 
 sem_tecla:
     jal atualiza_bombas
+    li s0, 0
     j loop
+
+LOOP1: beq s1, s2, FIMLOOP1
+lw t0, 0(s0)
+sw t0, 0(s1)
+addi s0, s0, 4
+addi s1, s1, 4
+j LOOP1
+
+FIMLOOP1:
+	li s1, 16  # pos x do jogador
+    	li s3, 48  # pos y do jogador
+    	la a0, char
+	mv a1, s1
+	mv a2, s3
+	li a3, 0
+	call PRINT
+    	j loop
 
 # BOMBA
 bomb:
@@ -57,7 +80,7 @@ encontra_vaga:
     addi t6, t6, 4
     li t5, 5
     blt t0, t5, encontra_vaga
-    j continua_bomba
+    ret
 
 salva_pos:
     sw s1, 0(t1)
@@ -205,13 +228,7 @@ espera_explosao:
     la t6, jogador_atingido
     lw s10, 0(t6)
     beqz s10, volta
-    li s1, 0
-    li s3, 0
-    la a0, char
-    mv a1, s1
-    mv a2, s3
-    li a3, 0
-    call PRINT
+    jal FIMLOOP1
 volta:
     j loop
 
