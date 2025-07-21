@@ -3,6 +3,7 @@
 .include "bombinha.s"
 .include "inimigo.data"
 .include "mapa2.data"
+.include "mapa2_colisao.data"
 
 .data
 char_x: .word 0
@@ -12,6 +13,7 @@ bomba_timer: .word 0, 0, 0, 0, 0
 inimigos_x: .word -1, -1, -1, -1, -1
 vidas: .word 3
 jogador_atingido: .word 0   # usado pra resetar dps da explos?o
+mapa_colisao_mem: .space 76800
 
 .text
    li s1, 0xFF000000
@@ -22,6 +24,7 @@ jogador_atingido: .word 0   # usado pra resetar dps da explos?o
 .globl main
 
 main:
+    jal copiar_mapa_colisao
     jal LOOP1
     
 loop:
@@ -62,6 +65,61 @@ FIMLOOP1:
 	li a3, 0
 	call PRINT
     	j loop
+
+# Verifica se há colisão em (a1, a2)
+# a1 = pos_x
+# a2 = pos_y
+# Retorna: t6 = 1 (sem colisão), t6 = 0 (houve colisão)
+verifica_colisao:
+    la t0, mapa_colisao_mem     # t0 = base do mapa
+
+    srli t1, a1, 4              # t1 = a1 / 16 (coluna)
+    srli t2, a2, 4              # t2 = a2 / 16 (linha)
+
+    li t3, 20                   # largura do mapa em células
+    mul t2, t2, t3              # linha * largura
+    add t1, t1, t2              # t1 = offset
+
+    add t1, t0, t1              # endereço final = base + offset
+    lbu t4, 0(t1)               # lê byte da célula em t4
+    
+    # DEBUG: printa valor lido
+    mv a0, t4
+    li a7, 1
+    ecall
+
+    li t5, 255
+    beq t4, t5, colidiu
+    li t5, 3
+    beq t4, t5, colidiu
+    li t5, 4
+    beq t4, t5, colidiu
+
+    li t6, 1                    # não colidiu
+    jr ra
+
+colidiu:
+    mv a0, t4
+    li a7, 1     # syscall print_int
+    ecall
+
+    j loop
+    
+# Copia N bytes do mapa_colisao para o endereço 0x100000
+copiar_mapa_colisao:
+    la a0, mapa2_colisao       # origem
+    la a1, mapa_colisao_mem    # destino
+    li t0, 76800               # tamanho total (320x240)
+
+copia_loop:
+    lbu t1, 0(a0)
+    sb t1, 0(a1)
+    addi a0, a0, 1
+    addi a1, a1, 1
+    addi t0, t0, -1
+    bnez t0, copia_loop
+
+    jr ra
 
 # BOMBA
 bomb:
@@ -201,62 +259,6 @@ explosao:
     addi t1, t1, -16
 
     li t3, 100000
-    
-explosao2:
-    # limpa flag de dano
-    la t6, jogador_atingido
-    sw zero, 0(t6)
-
-    # centro
-    la a0, bomba
-    call PRINT
-
-    # --- CIMA ---
-    addi a2, a2, -16       # 1 casa acima
-    call PRINT
-    addi a2, a2, -16       # 2 casas acima
-    call PRINT
-    addi a2, a2, 32        # volta pra posição original
-
-    # --- BAIXO ---
-    addi a2, a2, 16        # 1 casa abaixo
-    call PRINT
-    addi a2, a2, 16        # 2 casas abaixo
-    call PRINT
-    addi a2, a2, -32       # volta pra posição original
-
-    # --- ESQUERDA ---
-    addi a1, a1, -16       # 1 casa à esquerda
-    call PRINT
-    addi a1, a1, -16       # 2 casas à esquerda
-    call PRINT
-    addi a1, a1, 32        # volta pra posição original
-
-    # --- DIREITA ---
-    addi a1, a1, 16        # 1 casa à direita
-    call PRINT
-    addi a1, a1, 16        # 2 casas à direita
-    call PRINT
-    addi a1, a1, -32       # volta pra posição original
-
-    # checa dano
-    mv t1, a1
-    mv t2, a2
-
-    call checa_dano      # centro
-    addi t2, t2, -16
-    call checa_dano      # cima
-    addi t2, t2, 32
-    call checa_dano      # baixo
-    addi t2, t2, -16
-
-    addi t1, t1, -16
-    call checa_dano      # esquerda
-    addi t1, t1, 32
-    call checa_dano      # direita
-    addi t1, t1, -16
-
-    li t3, 100000
 espera_explosao:
     addi t3, t3, -1
     bnez t3, espera_explosao
@@ -308,7 +310,12 @@ right:
 	li t0, 304           # limite do mapa na horizontal
 	addi t1, s1, 16
 	bgt t1, t0, loop     # se passar do limite, n?o anda
-
+	
+	mv a1, t1
+    	mv a2, s3
+    	jal verifica_colisao
+    	beqz t6, loop       # impede andar se colidiu
+    
 	li t0, 0
 	la t1, bomba_x
 	la t2, bomba_y
@@ -347,7 +354,13 @@ printa_saida_d:
 ##******** ESQUERDA
 left:
 	ble s1, zero, loop
-
+	
+	addi t1, s1, -16   # destino: 16 px à esquerda
+    	mv a1, t1          # novo X
+    	mv a2, s3          # Y atual
+    	jal verifica_colisao
+    	beqz t6, loop      # colidiu? volta ao loop
+    	
 	li t0, 0
 	la t1, bomba_x
 	la t2, bomba_y
@@ -386,7 +399,13 @@ printa_saida_e:
 ##******** CIMA
 up:
 	ble s3, zero, loop
-
+	
+	addi t1, s3, -16   # destino: 16 px acima
+    	mv a1, s1          # x atual
+    	mv a2, t1          # novo y
+    	jal verifica_colisao
+    	beqz t6, loop
+    	
 	li t0, 0
 	la t1, bomba_x
 	la t2, bomba_y
@@ -426,6 +445,12 @@ printa_saida_c:
 down:
 	li t0, 224
 	bge s3, t0, loop
+	
+	addi t1, s3, 16    # destino: 16 px abaixo
+    	mv a1, s1          # x atual
+    	mv a2, t1          # novo y
+    	jal verifica_colisao
+    	beqz t6, loop
 
 	li t0, 0
 	la t1, bomba_x
