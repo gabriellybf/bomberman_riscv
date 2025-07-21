@@ -50,11 +50,11 @@ sem_tecla:
     j loop
 
 LOOP1: beq s1, s2, FIMLOOP1
-lw t0, 0(s0)
-sw t0, 0(s1)
-addi s0, s0, 4
-addi s1, s1, 4
-j LOOP1
+	lw t0, 0(s0)
+	sw t0, 0(s1)
+	addi s0, s0, 4
+	addi s1, s1, 4
+        j LOOP1
 
 FIMLOOP1:
 	li s1, 16  # pos x do jogador
@@ -66,46 +66,41 @@ FIMLOOP1:
 	call PRINT
     	j loop
 
-# Verifica se há colisão em (a1, a2)
+# verifica se há colisão em (a1, a2)
 # a1 = pos_x
 # a2 = pos_y
-# Retorna: t6 = 1 (sem colisão), t6 = 0 (houve colisão)
+# retorna: t6 = 1 (não colidiu), t6 = 0 (colidiu)
 verifica_colisao:
-    la t0, mapa_colisao_mem     # t0 = base do mapa
+    la t0, mapa_colisao_mem     # base do mapa
 
-    srli t1, a1, 4              # t1 = a1 / 16 (coluna)
-    srli t2, a2, 4              # t2 = a2 / 16 (linha)
+    srli t1, a1, 4              # coluna (x / 16)
+    srli t2, a2, 4              # linha  (y / 16)
 
     li t3, 20                   # largura do mapa em células
     mul t2, t2, t3              # linha * largura
-    add t1, t1, t2              # t1 = offset
+    add t1, t1, t2              # offset = linha * largura + coluna
 
-    add t1, t0, t1              # endereço final = base + offset
-    lbu t4, 0(t1)               # lê byte da célula em t4
-    
-    # DEBUG: printa valor lido
-    mv a0, t4
-    li a7, 1
-    ecall
+    add t1, t0, t1              # endereço final
+    lbu t4, 0(t1)               # valor da célula (0 = livre, >0 = colisão)
 
-    li t5, 255
-    beq t4, t5, colidiu
-    li t5, 3
-    beq t4, t5, colidiu
-    li t5, 4
-    beq t4, t5, colidiu
+    # DEBUG opcional
+    # mv a0, t4
+    # li a7, 1
+    # ecall
 
+    bnez t4, colidiu            # se t4 != 0 -> colidiu
     li t6, 1                    # não colidiu
     jr ra
 
 colidiu:
+    li t6, 0
     mv a0, t4
     li a7, 1     # syscall print_int
     ecall
 
     j loop
     
-# Copia N bytes do mapa_colisao para o endereço 0x100000
+# copia N bytes do mapa_colisao para o endereço 0x100000
 copiar_mapa_colisao:
     la a0, mapa2_colisao       # origem
     la a1, mapa_colisao_mem    # destino
@@ -220,26 +215,31 @@ explosao:
     # centro
     la a0, bomba
     call PRINT
-
+    call destruir_obstaculo
+    
     # cima
     addi a2, a2, -16
     call PRINT
-    addi a2, a2, 16
+    call destruir_obstaculo
+addi a2, a2, 16
 
-    # baixo
-    addi a2, a2, 16
-    call PRINT
-    addi a2, a2, -16
+# baixo
+addi a2, a2, 16
+call PRINT
+call destruir_obstaculo
+addi a2, a2, -16
 
-    # esquerda
-    addi a1, a1, -16
-    call PRINT
-    addi a1, a1, 16
+# esquerda
+addi a1, a1, -16
+call PRINT
+call destruir_obstaculo
+addi a1, a1, 16
 
-    # direita
-    addi a1, a1, 16
-    call PRINT
-    addi a1, a1, -16
+# direita
+addi a1, a1, 16
+call PRINT
+call destruir_obstaculo
+addi a1, a1, -16
 
     # checa dano
     mv t1, a1
@@ -303,6 +303,33 @@ checa_dano:
     li t6, 1
     sw t6, 0(t5)
 no_dano:
+    ret
+    
+# função que remove obstáculos destrutíveis (valor 255) da memória de colisão
+# não modifica obstáculos fixos (valor 50)
+# entradas:
+# a1 = x (pos_x da explosão)
+# a2 = y (pos_y da explosão)
+destruir_obstaculo:
+    la t0, mapa_colisao_mem     # base da memória de colisão
+
+    srli t1, a1, 4              # t1 = coluna (x / 16)
+    srli t2, a2, 4              # t2 = linha (y / 16)
+
+    li t3, 20                   # largura do mapa em células
+    mul t2, t2, t3              # t2 = linha * largura
+    add t1, t1, t2              # offset = linha * largura + coluna
+
+    add t1, t0, t1              # endereço = base + offset
+    lbu t4, 0(t1)               # lê valor atual
+
+    li t5, 255
+    bne t4, t5, fim_destruir    # só modifica se for exatamente 255
+
+    li t6, 0
+    sb t6, 0(t1)                # zera a posição (remove obstáculo)
+
+fim_destruir:
     ret
 
 ##******** DIREITA
