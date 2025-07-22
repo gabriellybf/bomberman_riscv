@@ -221,25 +221,25 @@ explosao:
     addi a2, a2, -16
     call PRINT
     call destruir_obstaculo
-addi a2, a2, 16
-
-# baixo
-addi a2, a2, 16
-call PRINT
-call destruir_obstaculo
-addi a2, a2, -16
-
-# esquerda
-addi a1, a1, -16
-call PRINT
-call destruir_obstaculo
-addi a1, a1, 16
-
-# direita
-addi a1, a1, 16
-call PRINT
-call destruir_obstaculo
-addi a1, a1, -16
+    addi a2, a2, 16
+    
+    # baixo
+    addi a2, a2, 16
+    call PRINT
+    call destruir_obstaculo
+    addi a2, a2, -16
+    
+    # esquerda
+    addi a1, a1, -16
+    call PRINT
+    call destruir_obstaculo
+    addi a1, a1, 16
+    
+    # direita
+    addi a1, a1, 16
+    call PRINT
+    call destruir_obstaculo
+    addi a1, a1, -16
 
     # checa dano
     mv t1, a1
@@ -263,13 +263,45 @@ espera_explosao:
     addi t3, t3, -1
     bnez t3, espera_explosao
 
-    # apagar explos?o
+    # apagar explosão: centro
     la a0, char_preto
     mv a1, a1
     mv a2, a2
     li a3, 0
     call PRINT
+    
+    # apagar posição do vetor da bomba correspondente ao centro
+    la t0, bomba_x
+    la t1, bomba_y
+    li t2, 0
+    
+    apaga_bomba_central_loop:
+    li t3, 5
+    beq t2, t3, fim_apaga_bomba
 
+    lw t4, 0(t0)       # bomba_x[i]
+    lw t5, 0(t1)       # bomba_y[i]
+
+    beq t4, a1, confere_y
+    j proxima_pos
+
+confere_y:
+    beq t5, a2, limpa_slot
+    j proxima_pos
+
+proxima_pos:
+    addi t0, t0, 4
+    addi t1, t1, 4
+    addi t2, t2, 1
+    j apaga_bomba_central_loop
+
+limpa_slot:
+    li t6, -1
+    sw t6, 0(t0)
+    sw t6, 0(t1)
+    j fim_apaga_bomba
+
+fim_apaga_bomba:
     addi a2, a2, -16
     call PRINT
     addi a2, a2, 32
@@ -287,6 +319,7 @@ espera_explosao:
     lw s10, 0(t6)
     beqz s10, volta
     jal FIMLOOP1
+    
 volta:
     j loop
 
@@ -302,6 +335,7 @@ checa_dano:
     la t5, jogador_atingido
     li t6, 1
     sw t6, 0(t5)
+    
 no_dano:
     ret
     
