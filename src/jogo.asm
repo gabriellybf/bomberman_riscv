@@ -14,17 +14,17 @@ inimigos_x: .word -1, -1, -1, -1, -1
 vidas: .word 3
 jogador_atingido: .word 0   # usado pra resetar dps da explos?o
 mapa_colisao_mem: .space 76800
+tempo_fase_inimigo: .word 200
+estado_inimigo: .word 0
 
 .text
-   li s1, 0xFF000000
-   li s2, 0xFF012C00
-   la s0, mapa2
-   addi s0, s0, 8
+   li s11, 0
 
 .globl main
 
 main:
     jal copiar_mapa_colisao
+    jal MENU
     jal LOOP1
     
 loop:
@@ -47,7 +47,29 @@ loop:
 sem_tecla:
     jal atualiza_bombas
     li s0, 0
+    addi s11, s11, 1
+    j INIMIGO
     j loop
+
+MENU:   beq s1, s2, GETCHAR
+	lw t0, 0(s0)
+	sw t0, 0(s1)
+	addi s0, s0, 4
+	addi s1, s1, 4
+        j LOOP1
+
+GETCHAR:
+      jal GetCharacter
+      li t1, 13
+      beq s0, t1, FIMENU
+      
+FIMENU:
+      li s11, 0
+      li s1, 0xFF000000
+      li s2, 0xFF012C00
+      la s0, mapa2
+      addi s0, s0, 8    
+      j LOOP1
 
 LOOP1: beq s1, s2, FIMLOOP1
 	lw t0, 0(s0)
@@ -65,23 +87,82 @@ FIMLOOP1:
 	li a3, 0
 	call PRINT
     	j loop
+        
+INIMIGO:
+    lw t0, tempo_fase_inimigo   # carrega 500 em t0
+    rem t1, s11, t0             # t1 = s11 % 500
+    bne t1, zero, verifica_estado  # se NÃO for múltiplo, só verifica o estado
 
-# verifica se há colisão em (a1, a2)
+    # se for múltiplo, inverte o estado
+    la t2, estado_inimigo
+    lw t3, 0(t2)
+    xori t3, t3, 1              # 0 ? 1
+    sw t3, 0(t2)
+
+verifica_estado:
+    la t2, estado_inimigo
+    lw t3, 0(t2)
+    beq t3, zero, inimigo1
+    j inimigo2
+
+inimigo1:
+    # printa na nova posição (64, 80)
+    li s5, 64
+    li s6, 80
+    la a0, char_preto
+    mv a1, s5
+    mv a2, s6
+    li a3, 0
+    call PRINT
+    
+    # apaga posição antiga (48, 80)
+    li s5, 48
+    li s6, 80
+    la a0, char
+    mv a1, s5
+    mv a2, s6
+    li a3, 0
+    call PRINT
+    
+    j loop
+
+inimigo2:
+    # apaga posição antiga (48, 80)
+    li s5, 48
+    li s6, 80
+    la a0, char_preto
+    mv a1, s5
+    mv a2, s6
+    li a3, 0
+    call PRINT
+
+    # printa na nova posição (64, 80)
+    li s5, 64
+    li s6, 80
+    la a0, char
+    mv a1, s5
+    mv a2, s6
+    li a3, 0
+    call PRINT
+
+    j loop
+
+# verifica se h? colis?o em (a1, a2)
 # a1 = pos_x
 # a2 = pos_y
-# retorna: t6 = 1 (não colidiu), t6 = 0 (colidiu)
+# retorna: t6 = 1 (n?o colidiu), t6 = 0 (colidiu)
 verifica_colisao:
     la t0, mapa_colisao_mem     # base do mapa
 
     srli t1, a1, 4              # coluna (x / 16)
     srli t2, a2, 4              # linha  (y / 16)
 
-    li t3, 20                   # largura do mapa em células
+    li t3, 20                   # largura do mapa em c?lulas
     mul t2, t2, t3              # linha * largura
     add t1, t1, t2              # offset = linha * largura + coluna
 
-    add t1, t0, t1              # endereço final
-    lbu t4, 0(t1)               # valor da célula (0 = livre, >0 = colisão)
+    add t1, t0, t1              # endere?o final
+    lbu t4, 0(t1)               # valor da c?lula (0 = livre, >0 = colis?o)
 
     # DEBUG opcional
     # mv a0, t4
@@ -89,7 +170,7 @@ verifica_colisao:
     # ecall
 
     bnez t4, colidiu            # se t4 != 0 -> colidiu
-    li t6, 1                    # não colidiu
+    li t6, 1                    # n?o colidiu
     jr ra
 
 colidiu:
@@ -100,7 +181,7 @@ colidiu:
 
     j loop
     
-# copia N bytes do mapa_colisao para o endereço 0x100000
+# copia N bytes do mapa_colisao para o endere?o 0x100000
 copiar_mapa_colisao:
     la a0, mapa2_colisao       # origem
     la a1, mapa_colisao_mem    # destino
@@ -263,14 +344,14 @@ espera_explosao:
     addi t3, t3, -1
     bnez t3, espera_explosao
 
-    # apagar explosão: centro
+    # apagar explos?o: centro
     la a0, char_preto
     mv a1, a1
     mv a2, a2
     li a3, 0
     call PRINT
     
-    # apagar posição do vetor da bomba correspondente ao centro
+    # apagar posi??o do vetor da bomba correspondente ao centro
     la t0, bomba_x
     la t1, bomba_y
     li t2, 0
@@ -339,29 +420,29 @@ checa_dano:
 no_dano:
     ret
     
-# função que remove obstáculos destrutíveis (valor 255) da memória de colisão
-# não modifica obstáculos fixos (valor 50)
+# fun??o que remove obst?culos destrut?veis (valor 255) da mem?ria de colis?o
+# n?o modifica obst?culos fixos (valor 50)
 # entradas:
-# a1 = x (pos_x da explosão)
-# a2 = y (pos_y da explosão)
+# a1 = x (pos_x da explos?o)
+# a2 = y (pos_y da explos?o)
 destruir_obstaculo:
-    la t0, mapa_colisao_mem     # base da memória de colisão
+    la t0, mapa_colisao_mem     # base da mem?ria de colis?o
 
     srli t1, a1, 4              # t1 = coluna (x / 16)
     srli t2, a2, 4              # t2 = linha (y / 16)
 
-    li t3, 20                   # largura do mapa em células
+    li t3, 20                   # largura do mapa em c?lulas
     mul t2, t2, t3              # t2 = linha * largura
     add t1, t1, t2              # offset = linha * largura + coluna
 
-    add t1, t0, t1              # endereço = base + offset
-    lbu t4, 0(t1)               # lê valor atual
+    add t1, t0, t1              # endere?o = base + offset
+    lbu t4, 0(t1)               # l? valor atual
 
     li t5, 255
-    bne t4, t5, fim_destruir    # só modifica se for exatamente 255
+    bne t4, t5, fim_destruir    # s? modifica se for exatamente 255
 
     li t6, 0
-    sb t6, 0(t1)                # zera a posição (remove obstáculo)
+    sb t6, 0(t1)                # zera a posi??o (remove obst?culo)
 
 fim_destruir:
     ret
@@ -416,7 +497,7 @@ printa_saida_d:
 left:
 	ble s1, zero, loop
 	
-	addi t1, s1, -16   # destino: 16 px à esquerda
+	addi t1, s1, -16   # destino: 16 px ? esquerda
     	mv a1, t1          # novo X
     	mv a2, s3          # Y atual
     	jal verifica_colisao
@@ -606,76 +687,3 @@ IsCharacterThere:
 	lw t1, 0(t0)
 	andi s0, t1, 1
 	ret
-	
-movimento:
-	li s10, 4              # s?o 4 movimentos (16, 0, 16, 32)
-
-movimento_loop:
-	# guarda posi??o anterior
-	mv s2, s8
-	li s4, 16
-
-	# apaga inimigo na posi??o anterior
-	la a0, char_preto
-	mv a1, s2
-	mv a2, s4
-	li a3, 0
-	call PRINT
-
-	# altera dire??o se estiver no passo 2 (s9 == 1)
-	li s11,1
-	beq s9, s11, volta_pro_zero
-
-# movimento normal pra direita
-	addi s8, s8, 16
-	j desenha
-
-volta_pro_zero:
-	li s8, 0
-
-desenha:
-	# imprime inimigo na nova posi??o
-	la a0, char
-	mv a1, s8
-	mv a2, s4
-	li a3, 0
-	call PRINT
-
-	# delay
-	li s6, 100000
-delay_loop:
-	addi s6, s6, -1
-	bnez s6, delay_loop
-
-	# incrementa contador de movimentos
-	addi s9, s9, 1
-	blt s9, s10, movimento_loop
-
-reiniciar:
-	# apaga onde parou (?ltima posi??o)
-	li s4, 16
-	la a0, char_preto
-	mv a1, s8
-	mv a2, s4
-	li a3, 0
-	call PRINT
-
-	# reinicia vari?veis
-	li s8, 0
-	li s9, 0
-
-	# imprime inimigo de volta no in?cio
-	la a0, char
-	mv a1, s8
-	mv a2, s4
-	li a3, 0
-	call PRINT
-
-	# delay antes de come?ar de novo
-	li s6, 100000
-delay_loop_reiniciar:
-	addi s6, s6, -1
-	bnez s6, delay_loop_reiniciar
-
-	# volta pro loop
-	j movimento_loop
