@@ -19,6 +19,7 @@
 .include "blocoinquebravelmapa1.data"
 .include "../data/tela_inicial.data"
 .include "oppen.data"
+.include "../data/oppenheimerlado.data"
 .include "../data/victory.data"
 
 .data
@@ -1511,7 +1512,7 @@ inimigo6FASE2:
     # adiciona 16 no inimigo_x
     li s5, 80
     li s6, 112
-    la a0, inimigofase2
+    la a0, inimigoLADOOP
     mv a1, s5
     mv a2, s6
     li a3, 0
