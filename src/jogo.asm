@@ -19,7 +19,7 @@
 .include "blocoinquebravelmapa1.data"
 .include "../data/tela_inicial.data"
 .include "oppen.data"
-.include "fimdefase.data"
+.include "../data/victory.data"
 
 .data
 char_x: .word 0
@@ -99,9 +99,42 @@ PAUSE:
      li t1, 32
      beq s0, t1, loop
      
-STOPGAME:
-	li a7, 10   # syscall 10 = exit
-    	ecall
+STOPGAME: li s11, 0
+    li s1, 0xFF000000
+    li s2, 0xFF012C00
+    la s0, victory
+    addi s0, s0, 8
+    j LOOP4
+LOOP4: 
+        beq s1, s2, FIM4
+	lw t0, 0(s0)
+	sw t0, 0(s1)
+	addi s0, s0, 4
+	addi s1, s1, 4
+        j LOOP4
+FIM4:
+    la t3, estado_jogo
+    li t4, 0
+    sw t4, 0(t3)
+    jal MENUFASE2
+MENUFASE2:
+    la t3, estado_jogo
+    lw t4, 0(t3)
+    bnez t4, GETCHARFASE2  # Se estado_jogo ? 0, pula a música
+
+    jal tocarMusica1
+    j GETCHARFASE2
+
+GETCHARFASE2:
+    jal GetCharacter
+    li t1, 13        # ENTER (CR)
+    li t2, 10        # ENTER (LF)
+    beq s0, t1, FIMENUFASE2
+    beq s0, t2, FIMENUFASE2
+    
+FIMENUFASE2:
+    li a7, 10
+    ecall
     	
 PRINTARINICIO:
     li s11, 0
@@ -1223,40 +1256,6 @@ IsCharacterThere:
 	
 #SEGUNDA FASE DO JOGO
 PRINTARINICIO2:
-    li s11, 0
-    li s1, 0xFF000000
-    li s2, 0xFF012C00
-    la s0, tela_proximafase
-    addi s0, s0, 8
-    j LOOP4
-LOOP4: 
-        beq s1, s2, FIM4
-	lw t0, 0(s0)
-	sw t0, 0(s1)
-	addi s0, s0, 4
-	addi s1, s1, 4
-        j LOOP4
-FIM4:
-    la t3, estado_jogo
-    li t4, 0
-    sw t4, 0(t3)
-    jal MENUFASE2
-MENUFASE2:
-    la t3, estado_jogo
-    lw t4, 0(t3)
-    bnez t4, GETCHARFASE2  # Se estado_jogo ? 0, pula a música
-
-    jal tocarMusica1
-    j GETCHARFASE2
-
-GETCHARFASE2:
-    jal GetCharacter
-    li t1, 13        # ENTER (CR)
-    li t2, 10        # ENTER (LF)
-    beq s0, t1, FIMENUFASE2
-    beq s0, t2, FIMENUFASE2
-    
-FIMENUFASE2:
     li s11, 0
     li s1, 0xFF000000
     li s2, 0xFF012C00
