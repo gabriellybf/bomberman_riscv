@@ -1,2 +1,15 @@
 # bomberman_riscv
 Jogo estilo Bomberman feito em Assembly RISC-V para a disciplina de Introdução aos Sistemas Computacionais.
+
+# COMO JOGAR? * . * . * . *
+1. ABRA A PASTA "SCR" E O ARQUIVO "JOGO.ASM".
+2. ATIVE AS OPÇÕES DE BIPMAP DISPLAY E KEYBORD AND DISPLAY MMIO SIMULATOR.
+3. CLICLE EM ASSEMBLY E GO.
+4. DEPOIS DA TELA DE INÍCIO E A MÚSICA APERTE NO ENTER!
+   
+# MOVIMENTOS * . * . * . *
+1. TECLA D -> LADO DIREITO
+2. TECLA S -> BAIXO
+3. TECLA A -> LADO ESQUERDO
+4. TECLA W -> CIMA
+5. TECLA ESPAÇO -> PAUSAR O JOGO
